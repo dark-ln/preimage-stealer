@@ -7,14 +7,14 @@ mod storage;
 
 use std::sync::Arc;
 
+use crate::memory::MemoryStorage;
 #[cfg(feature = "sled")]
 use crate::sled::SledStorage;
+use crate::storage::Storage;
 use sha2::Digest;
 use sha2::Sha256;
 use tokio::sync::Mutex;
 use tokio::task::spawn;
-use crate::memory::MemoryStorage;
-use crate::storage::Storage;
 
 #[tokio::main]
 async fn main() {
@@ -59,16 +59,7 @@ async fn main() {
     // the response to get the message.
     println!("{:#?}", info.alias);
 
-    let storage = {
-        #[cfg(feature = "sled")]
-        {
-            Arc::new(Mutex::new(parse_sled_config(args)))
-        }
-        #[cfg(not(feature = "sled"))]
-        {
-            Arc::new(Mutex::new(MemoryStorage::new()))
-        }
-    };
+    let storage = load_storage(args);
 
     // HTLC event stream part
     println!("starting htlc event subscription");
@@ -167,6 +158,17 @@ async fn main() {
 
     // TODO
     loop {}
+}
+
+fn load_storage(mut args: std::env::ArgsOs) -> Arc<Mutex<dyn Storage + Send>> {
+    #[cfg(feature = "sled")]
+    {
+        Arc::new(Mutex::new(parse_sled_config(args)))
+    }
+    #[cfg(not(feature = "sled"))]
+    {
+        Arc::new(Mutex::new(MemoryStorage::new()))
+    }
 }
 
 #[cfg(feature = "sled")]
