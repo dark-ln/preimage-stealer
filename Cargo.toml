@@ -9,3 +9,4 @@ tokio = "1"
 tokio-stream = "0.1.11"
 hex = "0.4"
 sha2 = "0.10.6"
+sled = { version = "0.34", optional = true }
