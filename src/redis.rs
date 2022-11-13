@@ -57,7 +57,19 @@ impl Storage for RedisStorage {
 
     fn total_stolen(&mut self) -> u64 {
         let value: RedisResult<u64> = self.client.get(STOLEN_KEY);
-        value.expect("Failed to read total stolen from redis")
+        match value {
+            Ok(v) => v,
+            Err(e) => {
+                match e.kind() {
+                    // this is common if there's no data to convert to int
+                    redis::ErrorKind::TypeError => 0,
+                    _ => {
+                        println!("redis error looking up amount stolen: {}", e);
+                        0
+                    }
+                }
+            }
+        }
     }
 
     fn add_stolen(&mut self, amt: u64) -> u64 {
@@ -67,7 +79,7 @@ impl Storage for RedisStorage {
             Ok(conn) => conn,
             Err(_) => {
                 println!("could not connect to redis to add amt stolen");
-                return;
+                return 0;
             }
         };
 
