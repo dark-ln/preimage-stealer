@@ -4,9 +4,8 @@ use std::collections::HashMap;
 
 pub struct MemoryStorage {
     map: HashMap<Vec<u8>, Box<dyn Any + Send + Sync>>,
+    stolen: u64,
 }
-
-unsafe impl Send for MemoryStorage {}
 
 impl Storage for MemoryStorage {
     fn set(&mut self, preimage: Vec<u8>, hash: Vec<u8>) {
@@ -18,12 +17,22 @@ impl Storage for MemoryStorage {
             .get(&hash)
             .map(|x| x.downcast_ref::<Vec<u8>>().cloned().unwrap())
     }
+
+    fn total_stolen(&mut self) -> u64 {
+        self.stolen
+    }
+
+    fn add_stolen(&mut self, amt: u64) -> u64 {
+        self.stolen += amt;
+        self.stolen
+    }
 }
 
 impl MemoryStorage {
     pub fn new() -> Self {
         MemoryStorage {
             map: HashMap::new(),
+            stolen: 0,
         }
     }
 }
