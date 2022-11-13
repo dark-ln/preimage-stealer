@@ -2,6 +2,7 @@
 
 use sha2::Digest;
 use sha2::Sha256;
+use tokio::task::spawn;
 
 #[tokio::main]
 async fn main() {
@@ -38,11 +39,12 @@ async fn main() {
         // All calls require at least empty parameter
         .get_info(tonic_openssl_lnd::lnrpc::GetInfoRequest {})
         .await
-        .expect("failed to get info");
+        .expect("failed to get info")
+        .into_inner();
 
     // We only print it here, note that in real-life code you may want to call `.into_inner()` on
     // the response to get the message.
-    println!("{:#?}", info);
+    println!("{:#?}", info.alias);
 
     // HTLC event stream part
     let mut htlc_event_stream = client
@@ -54,31 +56,32 @@ async fn main() {
 
     println!("starting htlc event subscription");
 
-    while let Some(htlc_event) = htlc_event_stream
-        .message()
-        .await
-        .expect("Failed to receive invoices")
-    {
-        println!("{:#?}", htlc_event);
-        if let Some(event) = htlc_event.event {
-            match event {
-                tonic_openssl_lnd::routerrpc::htlc_event::Event::SettleEvent(settle_event) => {
-                    let mut hasher = Sha256::new();
-                    hasher.update(&settle_event.preimage);
-                    let payment_hash = hasher.finalize();
-                    println!(
-                        "got preimage {} from payment hash {}",
-                        hex::encode(settle_event.preimage),
-                        hex::encode(payment_hash)
-                    )
-                }
-                _ => {}
-            };
+    spawn(async move {
+        while let Some(htlc_event) = htlc_event_stream
+            .message()
+            .await
+            .expect("Failed to receive invoices")
+        {
+            println!("{:#?}", htlc_event);
+            if let Some(event) = htlc_event.event {
+                match event {
+                    tonic_openssl_lnd::routerrpc::htlc_event::Event::SettleEvent(settle_event) => {
+                        let mut hasher = Sha256::new();
+                        hasher.update(&settle_event.preimage);
+                        let payment_hash = hasher.finalize();
+                        println!(
+                            "got preimage {} from payment hash {}",
+                            hex::encode(settle_event.preimage),
+                            hex::encode(payment_hash)
+                        )
+                    }
+                    _ => {}
+                };
+            }
         }
-    }
+    });
 
     // HTLC interceptor part
-    /*
     let (tx, rx) = tokio::sync::mpsc::channel::<
         tonic_openssl_lnd::routerrpc::ForwardHtlcInterceptResponse,
     >(1024);
@@ -91,22 +94,23 @@ async fn main() {
         .expect("Failed to call htlc_interceptor")
         .into_inner();
 
-    println!("starting htlc interception");
+    println!("Starting HTLC interception");
 
-    while let Some(htlc) = htlc_stream
-        .message()
-        .await
-        .expect("Failed to receive htlc's")
-    {
-        println!("htlc {:?}", htlc);
-        let response = tonic_openssl_lnd::routerrpc::ForwardHtlcInterceptResponse {
-            incoming_circuit_key: htlc.incoming_circuit_key,
-            action: 2,        // this will resume
-            preimage: vec![], // this would be for a real preimage
-            failure_code: 0,
-            failure_message: vec![],
-        };
-        tx.send(response).await.unwrap();
-    }
-    */
+    spawn(async move {
+        while let Some(htlc) = htlc_stream
+            .message()
+            .await
+            .expect("Failed to receive HTLCs")
+        {
+            println!("htlc {:?}", htlc);
+            let response = tonic_openssl_lnd::routerrpc::ForwardHtlcInterceptResponse {
+                incoming_circuit_key: htlc.incoming_circuit_key,
+                action: 2,        // this will resume
+                preimage: vec![], // this would be for a real preimage
+                failure_code: 0,
+                failure_message: vec![],
+            };
+            tx.send(response).await.unwrap();
+        }
+    });
 }
