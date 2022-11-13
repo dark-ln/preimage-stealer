@@ -8,6 +8,13 @@ HTLC interceptor to execute the theft.
 
 ## Running
 
+In memory storage:
+
 ```
 cargo run {LND_HOST} {LND_GRPC_PORT} {PATH_TO_LND_TLS_CERT} {PATH_TO_LND_ADMIN_MACAROON}
+```
+
+With sled db:
+```
+cargo run --features sled {LND_HOST} {LND_GRPC_PORT} {PATH_TO_LND_TLS_CERT} {PATH_TO_LND_ADMIN_MACAROON}
 ```

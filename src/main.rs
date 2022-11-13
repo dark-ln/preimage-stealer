@@ -59,10 +59,16 @@ async fn main() {
     // the response to get the message.
     println!("{:#?}", info.alias);
 
-    let storage = MemoryStorage::new();
-
-    // hashmap storing preimages and their hashes
-    let storage: Arc<Mutex<MemoryStorage>> = Arc::new(Mutex::new(storage));
+    let storage = {
+        #[cfg(feature = "sled")]
+        {
+            Arc::new(Mutex::new(parse_sled_config(args)))
+        }
+        #[cfg(not(feature = "sled"))]
+        {
+            Arc::new(Mutex::new(MemoryStorage::new()))
+        }
+    };
 
     // HTLC event stream part
     println!("starting htlc event subscription");
