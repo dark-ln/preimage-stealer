@@ -1,5 +1,7 @@
 // This program accepts four arguments: host, port, cert file, macaroon file
 
+mod storage;
+
 use std::collections::HashMap;
 use std::sync::Arc;
 
