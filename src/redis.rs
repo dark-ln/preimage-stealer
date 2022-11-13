@@ -36,8 +36,8 @@ impl Storage for RedisStorage {
         }
     }
 
-    fn get(&self, hash: Vec<u8>) -> Option<Vec<u8>> {
-        let value: RedisResult<Vec<u8>> = self.client.clone().get(hash);
+    fn get(&mut self, hash: Vec<u8>) -> Option<Vec<u8>> {
+        let value: RedisResult<Vec<u8>> = self.client.get(hash);
         match value {
             Ok(v) => {
                 if v.is_empty() {

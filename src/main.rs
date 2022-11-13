@@ -131,8 +131,8 @@ async fn main() {
         {
             println!("htlc {:?}", htlc);
 
-            let map = storage.lock().await;
-            let response = match map.get(htlc.payment_hash) {
+            let map = storage.clone();
+            let response = match map.lock().await.get(htlc.payment_hash) {
                 Some(preimage) => {
                     println!("HTLC preimage saved! Stealing...");
                     tonic_openssl_lnd::routerrpc::ForwardHtlcInterceptResponse {

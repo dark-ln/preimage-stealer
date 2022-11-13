@@ -12,7 +12,7 @@ impl Storage for SledStorage {
             .expect("Failed to write to sled db");
     }
 
-    fn get(&self, hash: Vec<u8>) -> Option<Vec<u8>> {
+    fn get(&mut self, hash: Vec<u8>) -> Option<Vec<u8>> {
         self.db
             .get(hash)
             .expect("Failed to read from sled db")
