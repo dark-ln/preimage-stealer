@@ -10,3 +10,4 @@ tokio-stream = "0.1.11"
 hex = "0.4"
 sha2 = "0.10.6"
 sled = { version = "0.34", optional = true }
+redis = { version = "0.22.1", features = ["tokio-comp"], optional = true }

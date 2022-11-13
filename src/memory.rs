@@ -1,5 +1,5 @@
-use std::any::Any;
 use crate::storage::Storage;
+use std::any::Any;
 use std::collections::HashMap;
 
 pub struct MemoryStorage {
@@ -13,8 +13,9 @@ impl Storage for MemoryStorage {
         self.map.insert(hash, Box::new(preimage));
     }
 
-    fn get(&self, hash: Vec<u8>) -> Option<Vec<u8>> {
-        self.map.get(&hash)
+    fn get(&mut self, hash: Vec<u8>) -> Option<Vec<u8>> {
+        self.map
+            .get(&hash)
             .map(|x| x.downcast_ref::<Vec<u8>>().cloned().unwrap())
     }
 }

@@ -1,6 +1,8 @@
 // This program accepts four arguments: host, port, cert file, macaroon file
 
 mod memory;
+#[cfg(feature = "redis")]
+mod redis;
 #[cfg(feature = "sled")]
 mod sled;
 mod storage;
@@ -8,8 +10,11 @@ mod storage;
 use std::sync::Arc;
 
 use crate::memory::MemoryStorage;
+#[cfg(feature = "redis")]
+use crate::redis::RedisStorage;
 #[cfg(feature = "sled")]
 use crate::sled::SledStorage;
+
 use crate::storage::Storage;
 use sha2::Digest;
 use sha2::Sha256;
@@ -126,8 +131,8 @@ async fn main() {
         {
             println!("htlc {:?}", htlc);
 
-            let map = storage.lock().await;
-            let response = match map.get(htlc.payment_hash) {
+            let map = storage.clone();
+            let response = match map.lock().await.get(htlc.payment_hash) {
                 Some(preimage) => {
                     println!("HTLC preimage saved! Stealing...");
                     tonic_openssl_lnd::routerrpc::ForwardHtlcInterceptResponse {
@@ -163,12 +168,13 @@ async fn main() {
 fn load_storage(mut args: std::env::ArgsOs) -> Arc<Mutex<dyn Storage + Send>> {
     #[cfg(feature = "sled")]
     {
-        Arc::new(Mutex::new(parse_sled_config(args)))
+        return Arc::new(Mutex::new(parse_sled_config(args)));
     }
-    #[cfg(not(feature = "sled"))]
+    #[cfg(feature = "redis")]
     {
-        Arc::new(Mutex::new(MemoryStorage::new()))
+        return Arc::new(Mutex::new(parse_redis_config(args)));
     }
+    return Arc::new(Mutex::new(MemoryStorage::new()));
 }
 
 #[cfg(feature = "sled")]
@@ -179,5 +185,16 @@ fn parse_sled_config(mut args: std::env::ArgsOs) -> SledStorage {
             SledStorage::new(str.as_str()).expect("Failed to create sled storage")
         }
         None => SledStorage::default(),
+    }
+}
+
+#[cfg(feature = "redis")]
+fn parse_redis_config(mut args: std::env::ArgsOs) -> RedisStorage {
+    match args.next() {
+        Some(arg) => {
+            let str = arg.into_string().expect("Failed to parse redis config arg");
+            RedisStorage::new(str.as_str()).expect("Failed to create redis storage")
+        }
+        None => RedisStorage::default(),
     }
 }
