@@ -5,3 +5,9 @@ This will automatically execute things like wormhole attacks for the user, allow
 
 Currently, this works by connecting to a lnd node and subscribes to the HTLC events to get preimages to save and the
 HTLC interceptor to execute the theft.
+
+## Running
+
+```
+cargo run {LND_HOST} {LND_GRPC_PORT} {PATH_TO_LND_TLS_CERT} {PATH_TO_LND_ADMIN_MACAROON}
+```
