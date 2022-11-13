@@ -33,6 +33,7 @@ async fn main() {
     let mut client = tonic_openssl_lnd::connect(host, port, cert_file, macaroon_file)
         .await
         .expect("failed to connect");
+    let client_router = client.router().clone();
 
     let info = client
         .lightning()
@@ -47,16 +48,15 @@ async fn main() {
     println!("{:#?}", info.alias);
 
     // HTLC event stream part
-    let mut htlc_event_stream = client
-        .router()
-        .subscribe_htlc_events(tonic_openssl_lnd::routerrpc::SubscribeHtlcEventsRequest {})
-        .await
-        .expect("Failed to call subscribe_htlc_events")
-        .into_inner();
-
     println!("starting htlc event subscription");
-
+    let mut client_router_htlc_event = client_router.clone();
     spawn(async move {
+        let mut htlc_event_stream = client_router_htlc_event
+            .subscribe_htlc_events(tonic_openssl_lnd::routerrpc::SubscribeHtlcEventsRequest {})
+            .await
+            .expect("Failed to call subscribe_htlc_events")
+            .into_inner();
+
         while let Some(htlc_event) = htlc_event_stream
             .message()
             .await
@@ -81,22 +81,23 @@ async fn main() {
         }
     });
 
+    println!("started htlc event subscription");
+
     // HTLC interceptor part
-    let (tx, rx) = tokio::sync::mpsc::channel::<
-        tonic_openssl_lnd::routerrpc::ForwardHtlcInterceptResponse,
-    >(1024);
-    let stream = tokio_stream::wrappers::ReceiverStream::new(rx);
-
-    let mut htlc_stream = client
-        .router()
-        .htlc_interceptor(stream)
-        .await
-        .expect("Failed to call htlc_interceptor")
-        .into_inner();
-
-    println!("Starting HTLC interception");
-
+    println!("starting HTLC interception");
     spawn(async move {
+        let mut client_router_htlc_intercept = client_router.clone();
+        let (tx, rx) = tokio::sync::mpsc::channel::<
+            tonic_openssl_lnd::routerrpc::ForwardHtlcInterceptResponse,
+        >(1024);
+        let stream = tokio_stream::wrappers::ReceiverStream::new(rx);
+
+        let mut htlc_stream = client_router_htlc_intercept
+            .htlc_interceptor(stream)
+            .await
+            .expect("Failed to call htlc_interceptor")
+            .into_inner();
+
         while let Some(htlc) = htlc_stream
             .message()
             .await
@@ -113,4 +114,9 @@ async fn main() {
             tx.send(response).await.unwrap();
         }
     });
+
+    println!("started htlc event interception");
+
+    // TODO
+    loop {}
 }
