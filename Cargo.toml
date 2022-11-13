@@ -1,0 +1,11 @@
+[package]
+edition = "2021"
+name = "preimage-stealser"
+version = "0.1.0"
+
+[dependencies]
+tonic_openssl_lnd = "0.2.0"
+tokio = "1"
+tokio-stream = "0.1.11"
+hex = "0.4"
+sha2 = "0.10.6"
