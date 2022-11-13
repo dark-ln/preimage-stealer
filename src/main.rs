@@ -83,27 +83,25 @@ async fn main() {
             .expect("Failed to receive invoices")
         {
             println!("{:#?}", htlc_event);
-            if let Some(event) = htlc_event.event {
-                if let tonic_openssl_lnd::routerrpc::htlc_event::Event::SettleEvent(settle_event) =
-                    event
-                {
-                    let mut hasher = Sha256::new();
-                    hasher.update(&settle_event.preimage);
-                    let payment_hash = hasher.finalize();
-                    println!(
-                        "got preimage {} from payment hash {}",
-                        hex::encode(settle_event.preimage.clone()),
-                        hex::encode(payment_hash)
-                    );
+            if let Some(tonic_openssl_lnd::routerrpc::htlc_event::Event::SettleEvent(
+                settle_event,
+            )) = htlc_event.event
+            {
+                let mut hasher = Sha256::new();
+                hasher.update(&settle_event.preimage);
+                let payment_hash = hasher.finalize();
+                println!(
+                    "got preimage {} from payment hash {}",
+                    hex::encode(settle_event.preimage.clone()),
+                    hex::encode(payment_hash)
+                );
 
-                    let _already_inserted = storage_htlc_event
-                        .clone()
-                        .lock()
-                        .await
-                        .set(settle_event.preimage, payment_hash.to_vec());
-                    ()
-                };
-            }
+                storage_htlc_event
+                    .clone()
+                    .lock()
+                    .await
+                    .set(settle_event.preimage, payment_hash.to_vec());
+            };
         }
     });
 
@@ -165,16 +163,18 @@ async fn main() {
     loop {}
 }
 
-fn load_storage(mut args: std::env::ArgsOs) -> Arc<Mutex<dyn Storage + Send>> {
+// name this _args to keep clippy happy when it's unused
+fn load_storage(mut _args: std::env::ArgsOs) -> Arc<Mutex<dyn Storage + Send>> {
     #[cfg(feature = "sled")]
     {
-        return Arc::new(Mutex::new(parse_sled_config(args)));
+        return Arc::new(Mutex::new(parse_sled_config(_args)));
     }
     #[cfg(feature = "redis")]
     {
-        return Arc::new(Mutex::new(parse_redis_config(args)));
+        return Arc::new(Mutex::new(parse_redis_config(_args)));
     }
-    return Arc::new(Mutex::new(MemoryStorage::new()));
+
+    Arc::new(Mutex::new(MemoryStorage::new()))
 }
 
 #[cfg(feature = "sled")]
