@@ -18,3 +18,13 @@ With sled db:
 ```
 cargo run --features sled {LND_HOST} {LND_GRPC_PORT} {PATH_TO_LND_TLS_CERT} {PATH_TO_LND_ADMIN_MACAROON}
 ```
+
+With redis db with localhost:
+```
+cargo run --features redis {LND_HOST} {LND_GRPC_PORT} {PATH_TO_LND_TLS_CERT} {PATH_TO_LND_ADMIN_MACAROON}
+```
+
+With redis db with specified url:
+```
+cargo run --features redis {LND_HOST} {LND_GRPC_PORT} {PATH_TO_LND_TLS_CERT} {PATH_TO_LND_ADMIN_MACAROON} {REDIS_URL}
+```
