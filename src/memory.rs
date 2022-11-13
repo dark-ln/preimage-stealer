@@ -9,7 +9,7 @@ pub struct MemoryStorage {
 unsafe impl Send for MemoryStorage {}
 
 impl Storage for MemoryStorage {
-    fn set(&mut self, preimage: Vec<u8>, hash: Vec<u8>) -> () {
+    fn set(&mut self, preimage: Vec<u8>, hash: Vec<u8>) {
         self.map.insert(hash, Box::new(preimage));
     }
 
