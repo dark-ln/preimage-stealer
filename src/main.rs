@@ -7,6 +7,8 @@ mod redis;
 mod sled;
 mod storage;
 
+use axum::routing::get;
+use axum::{Extension, Router};
 use std::sync::Arc;
 
 use crate::memory::MemoryStorage;
@@ -169,8 +171,18 @@ async fn main() {
     let stolen = storage.lock().await.total_stolen();
     println!("current amount stolen: {stolen} msats");
 
-    // TODO
-    loop {}
+    // TODO make port configurable
+    let addr = std::net::SocketAddr::from(([0, 0, 0, 0], 3000));
+    println!("listening on http://{}", addr);
+
+    let router = Router::new()
+        .route("/stolen", get(get_stolen))
+        .layer(Extension(storage));
+
+    axum::Server::bind(&addr)
+        .serve(router.into_make_service())
+        .await
+        .unwrap();
 }
 
 // name this _args to keep clippy happy when it's unused
@@ -207,4 +219,9 @@ fn parse_redis_config(mut args: std::env::ArgsOs) -> RedisStorage {
         }
         None => RedisStorage::default(),
     }
+}
+
+async fn get_stolen(Extension(stolen): Extension<Arc<Mutex<dyn Storage + Send>>>) -> String {
+    let amt = stolen.lock().await.total_stolen();
+    amt.to_string()
 }
