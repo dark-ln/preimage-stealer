@@ -7,8 +7,10 @@ mod redis;
 mod sled;
 mod storage;
 
+use axum::response::Html;
 use axum::routing::get;
 use axum::{Extension, Router};
+use dioxus::prelude::*;
 use std::sync::Arc;
 
 use crate::memory::MemoryStorage;
@@ -176,6 +178,7 @@ async fn main() {
     println!("listening on http://{}", addr);
 
     let router = Router::new()
+        .route("/", get(index))
         .route("/stolen", get(get_stolen))
         .layer(Extension(storage));
 
@@ -219,6 +222,14 @@ fn parse_redis_config(mut args: std::env::ArgsOs) -> RedisStorage {
         }
         None => RedisStorage::default(),
     }
+}
+
+async fn index(Extension(stolen): Extension<Arc<Mutex<dyn Storage + Send>>>) -> Html<String> {
+    let amt = stolen.lock().await.total_stolen();
+
+    Html(dioxus::ssr::render_lazy(rsx! {
+            h1 { "Total stolen: {amt} msats" }
+    }))
 }
 
 async fn get_stolen(Extension(stolen): Extension<Arc<Mutex<dyn Storage + Send>>>) -> String {
