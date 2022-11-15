@@ -16,15 +16,20 @@ cargo run -- --host {LND_HOST} --port {LND_GRPC_PORT} --cert-file {PATH_TO_LND_T
 
 With sled db:
 ```
-cargo run --features sled -- --host {LND_HOST} --port {LND_GRPC_PORT} --cert-file {PATH_TO_LND_TLS_CERT} --macaroon-file {PATH_TO_LND_ADMIN_MACAROON}
+cargo run-- --database sled --host {LND_HOST} --port {LND_GRPC_PORT} --cert-file {PATH_TO_LND_TLS_CERT} --macaroon-file {PATH_TO_LND_ADMIN_MACAROON}
+```
+
+With sled db with custom path:
+```
+cargo run-- --db-path {DB_PATH} --host {LND_HOST} --port {LND_GRPC_PORT} --cert-file {PATH_TO_LND_TLS_CERT} --macaroon-file {PATH_TO_LND_ADMIN_MACAROON}
 ```
 
 With redis db with localhost:
 ```
-cargo run --features redis -- --host {LND_HOST} --port {LND_GRPC_PORT} --cert-file {PATH_TO_LND_TLS_CERT} --macaroon-file {PATH_TO_LND_ADMIN_MACAROON}
+cargo run -- --database redis --host {LND_HOST} --port {LND_GRPC_PORT} --cert-file {PATH_TO_LND_TLS_CERT} --macaroon-file {PATH_TO_LND_ADMIN_MACAROON}
 ```
 
 With redis db with specified url:
 ```
-cargo run --features redis -- --host {LND_HOST} --port {LND_GRPC_PORT} --cert-file {PATH_TO_LND_TLS_CERT} --macaroon-file {PATH_TO_LND_ADMIN_MACAROON} --redis-url {REDIS_URL}
+cargo run -- --redis-url {REDIS_URL} --host {LND_HOST} --port {LND_GRPC_PORT} --cert-file {PATH_TO_LND_TLS_CERT} --macaroon-file {PATH_TO_LND_ADMIN_MACAROON
 ```
