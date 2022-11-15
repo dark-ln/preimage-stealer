@@ -96,14 +96,16 @@ async fn main() {
 }
 
 // name this _args to keep clippy happy when it's unused
-fn load_storage(mut _args: std::env::ArgsOs) -> Arc<Mutex<dyn Storage + Send>> {
+#[allow(unreachable_code)]
+#[allow(dead_code)]
+fn load_storage(args: std::env::ArgsOs) -> Arc<Mutex<dyn Storage + Send>> {
     #[cfg(feature = "sled")]
     {
-        return Arc::new(Mutex::new(parse_sled_config(_args)));
+        return Arc::new(Mutex::new(parse_sled_config(args)));
     }
     #[cfg(feature = "redis")]
     {
-        return Arc::new(Mutex::new(parse_redis_config(_args)));
+        return Arc::new(Mutex::new(parse_redis_config(args)));
     }
 
     Arc::new(Mutex::new(MemoryStorage::new()))

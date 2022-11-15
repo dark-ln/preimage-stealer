@@ -8,7 +8,7 @@ pub struct SledStorage {
 const STOLEN_KEY: &[u8] = "stolen".as_bytes();
 
 impl Storage for SledStorage {
-    fn set(&mut self, preimage: Vec<u8>, hash: Vec<u8>) -> () {
+    fn set(&mut self, preimage: Vec<u8>, hash: Vec<u8>) {
         self.db
             .insert(hash, preimage)
             .expect("Failed to write to sled db");
