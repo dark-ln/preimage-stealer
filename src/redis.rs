@@ -23,7 +23,7 @@ impl Default for RedisStorage {
 const STOLEN_KEY: &[u8] = "stolen".as_bytes();
 
 impl Storage for RedisStorage {
-    fn set(&mut self, preimage: Vec<u8>, hash: Vec<u8>) -> () {
+    fn set(&mut self, preimage: Vec<u8>, hash: Vec<u8>) {
         let mut conn = match self.client.get_connection() {
             Ok(conn) => conn,
             Err(_) => {
