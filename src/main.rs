@@ -1,10 +1,10 @@
 // This program accepts four arguments: host, port, cert file, macaroon file
 
+extern crate core;
+
 mod config;
 mod memory;
-#[cfg(feature = "redis")]
 mod redis;
-#[cfg(feature = "sled")]
 mod sled;
 mod storage;
 mod subscribers;
@@ -17,9 +17,7 @@ use dioxus::prelude::*;
 use std::sync::Arc;
 
 use crate::memory::MemoryStorage;
-#[cfg(feature = "redis")]
 use crate::redis::RedisStorage;
-#[cfg(feature = "sled")]
 use crate::sled::SledStorage;
 
 use crate::config::*;
@@ -33,7 +31,7 @@ async fn main() {
     let config: Config = Config::parse();
     let config_clone = config.clone();
 
-    let cert_file = config.cert_file.unwrap_or_else(|| default_cert_file());
+    let cert_file = config.cert_file.unwrap_or_else(default_cert_file);
     let macaroon_file = config
         .macaroon_file
         .unwrap_or_else(|| default_macaroon_file(config.network));
@@ -83,35 +81,65 @@ async fn main() {
         .unwrap();
 }
 
-#[allow(unreachable_code)]
-#[allow(dead_code)]
-#[allow(unused)]
 fn load_storage(cfg: Config) -> Arc<Mutex<dyn Storage + Send>> {
-    #[cfg(feature = "sled")]
-    {
-        return Arc::new(Mutex::new(parse_sled_config(cfg)));
-    }
-    #[cfg(feature = "redis")]
-    {
-        return Arc::new(Mutex::new(parse_redis_config(cfg)));
-    }
+    match cfg.database {
+        // if no database type is defined, check the db-path and redis-url configs
+        // set database config based on those, otherwise use memory db
+        None => match cfg.db_path {
+            Some(db_path) => Arc::new(Mutex::new(
+                SledStorage::new(db_path.as_str()).expect("Failed to create sled storage"),
+            )),
+            None => match cfg.redis_url {
+                Some(redis_url) => Arc::new(Mutex::new(
+                    RedisStorage::new(redis_url.as_str()).expect("Failed to create redis storage"),
+                )),
+                None => Arc::new(Mutex::new(MemoryStorage::new())),
+            },
+        },
+        // if a database type is set, use that type with provided config if available
+        // error if conflicting database configurations are given
+        Some(database) => {
+            match database.to_lowercase().as_str() {
+                "memory" => {
+                    // these configs should not be set
+                    if cfg.redis_url.is_some() {
+                        panic!("redis-url cannot be set for memory db")
+                    }
+                    if cfg.db_path.is_some() {
+                        panic!("db-path cannot be set for memory db")
+                    }
+                    Arc::new(Mutex::new(MemoryStorage::new()))
+                }
+                "sled" => {
+                    // these configs should not be set
+                    if cfg.redis_url.is_some() {
+                        panic!("redis-url cannot be set for sled db")
+                    }
+                    match cfg.db_path {
+                        Some(db_path) => Arc::new(Mutex::new(
+                            SledStorage::new(db_path.as_str())
+                                .expect("Failed to create sled storage"),
+                        )),
+                        None => Arc::new(Mutex::new(SledStorage::default())),
+                    }
+                }
+                "redis" => {
+                    // these configs should not be set
+                    if cfg.db_path.is_some() {
+                        panic!("db-path cannot be set for redis db")
+                    }
 
-    Arc::new(Mutex::new(MemoryStorage::new()))
-}
-
-#[cfg(feature = "sled")]
-fn parse_sled_config(cfg: Config) -> SledStorage {
-    match cfg.db_path {
-        Some(str) => SledStorage::new(str.as_str()).expect("Failed to create sled storage"),
-        None => SledStorage::default(),
-    }
-}
-
-#[cfg(feature = "redis")]
-fn parse_redis_config(cfg: Config) -> RedisStorage {
-    match cfg.redis_url {
-        Some(str) => RedisStorage::new(str.as_str()).expect("Failed to create redis storage"),
-        None => RedisStorage::default(),
+                    match cfg.redis_url {
+                        Some(redis_url) => Arc::new(Mutex::new(
+                            RedisStorage::new(redis_url.as_str())
+                                .expect("Failed to create redis storage"),
+                        )),
+                        None => Arc::new(Mutex::new(RedisStorage::default())),
+                    }
+                }
+                _ => panic!("Failed to parse database type"),
+            }
+        }
     }
 }
 

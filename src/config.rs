@@ -19,11 +19,12 @@ pub struct Config {
     #[clap(long)]
     /// Path to admin.macaroon file for lnd
     pub macaroon_file: Option<String>,
-    #[cfg(feature = "sled")]
-    #[clap(long, short)]
+    #[clap(short, long)]
+    /// Type of database ["memory", "sled", "redis"] [default: memory]
+    pub database: Option<String>,
+    #[clap(long)]
     /// Sled database path
     pub db_path: Option<String>,
-    #[cfg(feature = "redis")]
     #[clap(long)]
     /// Redis server url
     pub redis_url: Option<String>,
