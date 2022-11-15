@@ -1,9 +1,10 @@
 // This program accepts four arguments: host, port, cert file, macaroon file
 
+extern crate core;
+
+mod config;
 mod memory;
-#[cfg(feature = "redis")]
 mod redis;
-#[cfg(feature = "sled")]
 mod sled;
 mod storage;
 mod subscribers;
@@ -11,15 +12,15 @@ mod subscribers;
 use axum::response::Html;
 use axum::routing::get;
 use axum::{Extension, Router};
+use clap::Parser;
 use dioxus::prelude::*;
 use std::sync::Arc;
 
 use crate::memory::MemoryStorage;
-#[cfg(feature = "redis")]
 use crate::redis::RedisStorage;
-#[cfg(feature = "sled")]
 use crate::sled::SledStorage;
 
+use crate::config::*;
 use crate::storage::Storage;
 use crate::subscribers::*;
 use tokio::sync::Mutex;
@@ -27,36 +28,21 @@ use tokio::task::spawn;
 
 #[tokio::main]
 async fn main() {
-    let mut args = std::env::args_os();
-    args.next().expect("not even zeroth arg given");
-    let host = args
-        .next()
-        .expect("missing arguments: host, port, cert file, macaroon file");
-    let port = args
-        .next()
-        .expect("missing arguments: port, cert file, macaroon file");
-    let cert_file = args
-        .next()
-        .expect("missing arguments: cert file, macaroon file");
-    let macaroon_file = args.next().expect("missing argument: macaroon file");
-    let host: String = host.into_string().expect("host is not UTF-8");
-    let port: u32 = port
-        .into_string()
-        .expect("port is not UTF-8")
-        .parse()
-        .expect("port is not u32");
-    let cert_file: String = cert_file.into_string().expect("cert_file is not UTF-8");
-    let macaroon_file: String = macaroon_file
-        .into_string()
-        .expect("macaroon_file is not UTF-8");
+    let config: Config = Config::parse();
+    let config_clone = config.clone();
+
+    let cert_file = config.cert_file.unwrap_or_else(default_cert_file);
+    let macaroon_file = config
+        .macaroon_file
+        .unwrap_or_else(|| default_macaroon_file(config.network));
 
     // Connecting to LND requires only host, port, cert file, macaroon file
-    let mut client = tonic_openssl_lnd::connect(host, port, cert_file, macaroon_file)
+    let mut client = tonic_openssl_lnd::connect(config.host, config.port, cert_file, macaroon_file)
         .await
         .expect("failed to connect");
     let client_router = client.router().clone();
 
-    let storage = load_storage(args);
+    let storage = load_storage(config_clone);
 
     // HTLC event stream part
     println!("starting htlc event subscription");
@@ -95,41 +81,65 @@ async fn main() {
         .unwrap();
 }
 
-// name this _args to keep clippy happy when it's unused
-#[allow(unreachable_code)]
-#[allow(dead_code)]
-fn load_storage(args: std::env::ArgsOs) -> Arc<Mutex<dyn Storage + Send>> {
-    #[cfg(feature = "sled")]
-    {
-        return Arc::new(Mutex::new(parse_sled_config(args)));
-    }
-    #[cfg(feature = "redis")]
-    {
-        return Arc::new(Mutex::new(parse_redis_config(args)));
-    }
+fn load_storage(cfg: Config) -> Arc<Mutex<dyn Storage + Send>> {
+    match cfg.database {
+        // if no database type is defined, check the db-path and redis-url configs
+        // set database config based on those, otherwise use memory db
+        None => match cfg.db_path {
+            Some(db_path) => Arc::new(Mutex::new(
+                SledStorage::new(db_path.as_str()).expect("Failed to create sled storage"),
+            )),
+            None => match cfg.redis_url {
+                Some(redis_url) => Arc::new(Mutex::new(
+                    RedisStorage::new(redis_url.as_str()).expect("Failed to create redis storage"),
+                )),
+                None => Arc::new(Mutex::new(MemoryStorage::new())),
+            },
+        },
+        // if a database type is set, use that type with provided config if available
+        // error if conflicting database configurations are given
+        Some(database) => {
+            match database.to_lowercase().as_str() {
+                "memory" => {
+                    // these configs should not be set
+                    if cfg.redis_url.is_some() {
+                        panic!("redis-url cannot be set for memory db")
+                    }
+                    if cfg.db_path.is_some() {
+                        panic!("db-path cannot be set for memory db")
+                    }
+                    Arc::new(Mutex::new(MemoryStorage::new()))
+                }
+                "sled" => {
+                    // these configs should not be set
+                    if cfg.redis_url.is_some() {
+                        panic!("redis-url cannot be set for sled db")
+                    }
+                    match cfg.db_path {
+                        Some(db_path) => Arc::new(Mutex::new(
+                            SledStorage::new(db_path.as_str())
+                                .expect("Failed to create sled storage"),
+                        )),
+                        None => Arc::new(Mutex::new(SledStorage::default())),
+                    }
+                }
+                "redis" => {
+                    // these configs should not be set
+                    if cfg.db_path.is_some() {
+                        panic!("db-path cannot be set for redis db")
+                    }
 
-    Arc::new(Mutex::new(MemoryStorage::new()))
-}
-
-#[cfg(feature = "sled")]
-fn parse_sled_config(mut args: std::env::ArgsOs) -> SledStorage {
-    match args.next() {
-        Some(arg) => {
-            let str = arg.into_string().expect("Failed to parse sled config arg");
-            SledStorage::new(str.as_str()).expect("Failed to create sled storage")
+                    match cfg.redis_url {
+                        Some(redis_url) => Arc::new(Mutex::new(
+                            RedisStorage::new(redis_url.as_str())
+                                .expect("Failed to create redis storage"),
+                        )),
+                        None => Arc::new(Mutex::new(RedisStorage::default())),
+                    }
+                }
+                _ => panic!("Failed to parse database type"),
+            }
         }
-        None => SledStorage::default(),
-    }
-}
-
-#[cfg(feature = "redis")]
-fn parse_redis_config(mut args: std::env::ArgsOs) -> RedisStorage {
-    match args.next() {
-        Some(arg) => {
-            let str = arg.into_string().expect("Failed to parse redis config arg");
-            RedisStorage::new(str.as_str()).expect("Failed to create redis storage")
-        }
-        None => RedisStorage::default(),
     }
 }
 
