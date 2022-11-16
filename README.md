@@ -33,3 +33,20 @@ With redis db with specified url:
 ```
 cargo run -- --redis-url {REDIS_URL} --host {LND_HOST} --port {LND_GRPC_PORT} --cert-file {PATH_TO_LND_TLS_CERT} --macaroon-file {PATH_TO_LND_ADMIN_MACAROON
 ```
+
+### Docker
+
+#### Build
+
+This option is a local file mounted to a volume that persists between docker runs. Look at the config options above to see what you might like to use with docker.
+
+First create a data directory and put your tls.cert and admin.macaroon files there. If you're running sled (enabled by default) then your sled db will persist there as well once the docker file runs.
+
+```
+docker run \
+-e FLAGS='--host host.docker.internal --port 10009 --cert-file /data/tls.cert --macaroon-file /data/admin.macaroon --database sled --db-path /data/preimages' \
+-p 3001:3000 \
+-v /YOUR/TEMP/DIR/HERE:/data \
+--add-host=host.docker.internal:host-gateway" \
+dark-ln/preimage-stealer
+```
