@@ -93,10 +93,26 @@ async fn main() {
         .route("/stolen", get(get_stolen))
         .layer(Extension(state));
 
-    axum::Server::bind(&addr)
-        .serve(router.into_make_service())
-        .await
-        .unwrap();
+    let server = axum::Server::bind(&addr).serve(router.into_make_service());
+
+    // Prepare some signal for when the server should start shutting down...
+    let (tx, rx) = tokio::sync::oneshot::channel::<()>();
+    let graceful = server.with_graceful_shutdown(async {
+        rx.await.ok();
+    });
+
+    // shutdown when signaled
+    tokio::select! {
+        _ = tokio::signal::ctrl_c() => {
+            println!("Gracefully shutting down...");
+            let _ = tx.send(());
+        },
+    }
+
+    // Await the `server` receiving the signal...
+    if let Err(e) = graceful.await {
+        eprintln!("server error: {}", e);
+    }
 }
 
 fn load_storage(cfg: Config) -> Arc<Mutex<dyn Storage + Send>> {
