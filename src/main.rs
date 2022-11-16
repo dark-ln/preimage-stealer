@@ -26,6 +26,12 @@ use crate::subscribers::*;
 use tokio::sync::Mutex;
 use tokio::task::spawn;
 
+#[derive(Clone)]
+struct State {
+    storage: Arc<Mutex<dyn Storage + Send>>,
+    watch_only: bool,
+}
+
 #[tokio::main]
 async fn main() {
     let config: Config = Config::parse();
@@ -59,21 +65,33 @@ async fn main() {
     println!("starting HTLC interception");
     let storage_htlc_interceptor = storage.clone();
 
-    spawn(async move { start_htlc_interceptor(client_router, storage_htlc_interceptor).await });
+    spawn(async move {
+        start_htlc_interceptor(client_router, storage_htlc_interceptor, config.watch_only).await
+    });
 
     println!("started htlc event interception");
 
-    let stolen = storage.lock().await.total_stolen();
-    println!("current amount stolen: {stolen} msats");
+    if config.watch_only {
+        let stolen = storage.lock().await.total_stolen_watch_only();
+        println!("current potential amount stolen: {stolen} msats");
+    } else {
+        let stolen = storage.lock().await.total_stolen();
+        println!("current amount stolen: {stolen} msats");
+    }
 
     // TODO make port configurable
     let addr = std::net::SocketAddr::from(([0, 0, 0, 0], 3000));
     println!("listening on http://{}", addr);
 
+    let state = State {
+        storage,
+        watch_only: config.watch_only,
+    };
+
     let router = Router::new()
         .route("/", get(index))
         .route("/stolen", get(get_stolen))
-        .layer(Extension(storage));
+        .layer(Extension(state));
 
     axum::Server::bind(&addr)
         .serve(router.into_make_service())
@@ -143,15 +161,25 @@ fn load_storage(cfg: Config) -> Arc<Mutex<dyn Storage + Send>> {
     }
 }
 
-async fn index(Extension(stolen): Extension<Arc<Mutex<dyn Storage + Send>>>) -> Html<String> {
-    let amt = stolen.lock().await.total_stolen();
+async fn index(Extension(state): Extension<State>) -> Html<String> {
+    let str = if state.watch_only {
+        let amt = state.storage.lock().await.total_stolen_watch_only();
+        format!("Potential amount stolen: {amt} msats")
+    } else {
+        let amt = state.storage.lock().await.total_stolen();
+        format!("Total stolen: {amt} msats")
+    };
 
     Html(dioxus::ssr::render_lazy(rsx! {
-            h1 { "Total stolen: {amt} msats" }
+            h1 { "{str}" }
     }))
 }
 
-async fn get_stolen(Extension(stolen): Extension<Arc<Mutex<dyn Storage + Send>>>) -> String {
-    let amt = stolen.lock().await.total_stolen();
+async fn get_stolen(Extension(state): Extension<State>) -> String {
+    let amt = if state.watch_only {
+        state.storage.lock().await.total_stolen_watch_only()
+    } else {
+        state.storage.lock().await.total_stolen()
+    };
     amt.to_string()
 }

