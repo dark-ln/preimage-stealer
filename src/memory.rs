@@ -5,6 +5,7 @@ use std::collections::HashMap;
 pub struct MemoryStorage {
     map: HashMap<Vec<u8>, Box<dyn Any + Send + Sync>>,
     stolen: u64,
+    watch_only_stolen: u64,
 }
 
 impl Storage for MemoryStorage {
@@ -26,6 +27,15 @@ impl Storage for MemoryStorage {
         self.stolen += amt;
         self.stolen
     }
+
+    fn total_stolen_watch_only(&mut self) -> u64 {
+        self.watch_only_stolen
+    }
+
+    fn add_stolen_watch_only(&mut self, amt: u64) -> u64 {
+        self.watch_only_stolen += amt;
+        self.watch_only_stolen
+    }
 }
 
 impl MemoryStorage {
@@ -33,6 +43,7 @@ impl MemoryStorage {
         MemoryStorage {
             map: HashMap::new(),
             stolen: 0,
+            watch_only_stolen: 0,
         }
     }
 }

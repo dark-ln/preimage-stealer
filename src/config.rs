@@ -4,7 +4,10 @@ use clap::Parser;
 #[command(version, about, author)]
 /// A utility to automatically claim HTLCs with revealed preimages
 pub struct Config {
-    #[clap(default_value_t = String::from("127.0.0.1"), long)]
+    #[clap(default_value_t = false, short, long)]
+    /// Only monitors and tracks for hash re-use does not execute the exploit
+    pub watch_only: bool,
+    #[clap(default_value_t = String::from("127.0.0.1"), short='H', long)]
     /// Host of the GRPC server for lnd
     pub host: String,
     #[clap(default_value_t = 10009, short, long)]
