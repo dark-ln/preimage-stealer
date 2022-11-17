@@ -10,4 +10,5 @@ RUN apt-get update
 RUN apt-get install -y build-essential cmake pkg-config libssl-dev libprotobuf-dev protobuf-compiler 
 RUN mkdir /data
 COPY --from=builder /usr/local/cargo/bin/preimage-stealer /usr/local/bin/preimage-stealer
-ENTRYPOINT preimage-stealer ${FLAGS}
+
+ENTRYPOINT ["/bin/bash", "-c", "preimage-stealer ${FLAGS}"]
