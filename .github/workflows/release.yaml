@@ -39,10 +39,10 @@ jobs:
           rust: stable
           target: x86_64-pc-windows-msvc
           cross: false
-        - build: aarch64-macos
-          os: macos-latest
-          rust: stable
-          target: aarch64-apple-darwin
+        # - build: aarch64-macos
+        #   os: macos-latest
+        #   rust: stable
+        #   target: aarch64-apple-darwin
         # - build: x86_64-win-gnu
         #   os: windows-2019
         #   rust: stable-x86_64-gnu
@@ -57,6 +57,14 @@ jobs:
         uses: actions/checkout@v2
         with:
           submodules: true
+
+      - name: Install System Dependencies (aarch64-linux)
+        if: matrix.build == 'aarch64-linux'
+        run: |
+          export OPENSSL_DIR=/usr/lib/ssl
+          env
+          sudo apt-get update
+          sudo apt-get install -y openssl libssl-dev pkg-config gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu
 
       - name: Windows VCPKG
         if: matrix.os == 'windows-latest'
