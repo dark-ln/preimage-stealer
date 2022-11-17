@@ -44,7 +44,7 @@ First create a data directory and put your tls.cert and admin.macaroon files the
 
 ```
 docker run \
--e FLAGS='--host host.docker.internal --lnd-port 10009 --cert-file /data/tls.cert --macaroon-file /data/admin.macaroon --database sled --db-path /data/preimages' \
+-e FLAGS='--lnd-host host.docker.internal --lnd-port 10009 --cert-file /data/tls.cert --macaroon-file /data/admin.macaroon --database sled --db-path /data/preimages' \
 -p 3001:3000 \
 -v /YOUR/TEMP/DIR/HERE:/data \
 --add-host=host.docker.internal:host-gateway" \
