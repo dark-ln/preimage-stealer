@@ -7,12 +7,12 @@ pub struct Config {
     #[clap(default_value_t = false, short, long)]
     /// Only monitors and tracks for hash re-use does not execute the exploit
     pub watch_only: bool,
-    #[clap(default_value_t = String::from("127.0.0.1"), short='H', long)]
+    #[clap(default_value_t = String::from("127.0.0.1"), long)]
     /// Host of the GRPC server for lnd
-    pub host: String,
-    #[clap(default_value_t = 10009, short, long)]
+    pub lnd_host: String,
+    #[clap(default_value_t = 10009, long)]
     /// Port of the GRPC server for lnd
-    pub port: u32,
+    pub lnd_port: u32,
     #[clap(default_value_t = String::from("mainnet"), short, long)]
     /// Network lnd is running on ["mainnet", "testnet", "signet, "simnet, "regtest"]
     pub network: String,
@@ -31,6 +31,12 @@ pub struct Config {
     #[clap(long)]
     /// Redis server url
     pub redis_url: Option<String>,
+    #[clap(default_value_t = String::from("0.0.0.0"), long)]
+    /// Bind address for preimage-stealer's webserver
+    pub bind: String,
+    #[clap(default_value_t = 3000, long)]
+    /// Port for preimage-stealer's webserver
+    pub port: u16,
 }
 
 fn home_dir() -> String {
