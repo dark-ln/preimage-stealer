@@ -58,6 +58,14 @@ jobs:
         with:
           submodules: true
 
+      - name: Install System Dependencies (aarch64-linux)
+        if: matrix.build == 'aarch64-linux'
+        run: |
+          export OPENSSL_DIR=/usr/lib/ssl
+          env
+          sudo apt-get update
+          sudo apt-get install -y openssl libssl-dev pkg-config gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu
+
       - name: Windows VCPKG
         if: matrix.os == 'windows-latest'
         run: echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Append
