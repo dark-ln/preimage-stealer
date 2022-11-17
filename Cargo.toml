@@ -3,6 +3,10 @@ edition = "2021"
 name = "preimage-stealer"
 version = "0.1.0"
 
+[[bin]]
+name = "preimage-stealer"
+path = "src/main.rs"
+
 [dependencies]
 tonic_openssl_lnd = "0.2.0"
 tokio = "1"
