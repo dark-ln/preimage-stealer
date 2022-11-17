@@ -43,9 +43,10 @@ async fn main() {
         .unwrap_or_else(|| default_macaroon_file(config.network));
 
     // Connecting to LND requires only host, port, cert file, macaroon file
-    let mut client = tonic_openssl_lnd::connect(config.host, config.port, cert_file, macaroon_file)
-        .await
-        .expect("failed to connect");
+    let mut client =
+        tonic_openssl_lnd::connect(config.lnd_host, config.lnd_port, cert_file, macaroon_file)
+            .await
+            .expect("failed to connect");
     let client_router = client.router().clone();
 
     let storage = load_storage(config_clone);
@@ -79,8 +80,9 @@ async fn main() {
         println!("current amount stolen: {stolen} msats");
     }
 
-    // TODO make port configurable
-    let addr = std::net::SocketAddr::from(([0, 0, 0, 0], 3000));
+    let addr: std::net::SocketAddr = format!("{}:{}", config.bind, config.port)
+        .parse()
+        .expect("Failed to parse host/port for webserver");
     println!("listening on http://{}", addr);
 
     let state = State {

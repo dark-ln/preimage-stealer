@@ -11,27 +11,27 @@ HTLC interceptor to execute the theft.
 In memory storage:
 
 ```
-cargo run -- --host {LND_HOST} --port {LND_GRPC_PORT} --cert-file {PATH_TO_LND_TLS_CERT} --macaroon-file {PATH_TO_LND_ADMIN_MACAROON}
+cargo run -- --lnd-host {LND_HOST} --lnd-port {LND_GRPC_PORT} --cert-file {PATH_TO_LND_TLS_CERT} --macaroon-file {PATH_TO_LND_ADMIN_MACAROON}
 ```
 
 With sled db:
 ```
-cargo run-- --database sled --host {LND_HOST} --port {LND_GRPC_PORT} --cert-file {PATH_TO_LND_TLS_CERT} --macaroon-file {PATH_TO_LND_ADMIN_MACAROON}
+cargo run-- --database sled --lnd-host {LND_HOST} --lnd-port {LND_GRPC_PORT} --cert-file {PATH_TO_LND_TLS_CERT} --macaroon-file {PATH_TO_LND_ADMIN_MACAROON}
 ```
 
 With sled db with custom path:
 ```
-cargo run-- --db-path {DB_PATH} --host {LND_HOST} --port {LND_GRPC_PORT} --cert-file {PATH_TO_LND_TLS_CERT} --macaroon-file {PATH_TO_LND_ADMIN_MACAROON}
+cargo run-- --db-path {DB_PATH} --lnd-host {LND_HOST} --lnd-port {LND_GRPC_PORT} --cert-file {PATH_TO_LND_TLS_CERT} --macaroon-file {PATH_TO_LND_ADMIN_MACAROON}
 ```
 
 With redis db with localhost:
 ```
-cargo run -- --database redis --host {LND_HOST} --port {LND_GRPC_PORT} --cert-file {PATH_TO_LND_TLS_CERT} --macaroon-file {PATH_TO_LND_ADMIN_MACAROON}
+cargo run -- --database redis --lnd-host {LND_HOST} --lnd-port {LND_GRPC_PORT} --cert-file {PATH_TO_LND_TLS_CERT} --macaroon-file {PATH_TO_LND_ADMIN_MACAROON}
 ```
 
 With redis db with specified url:
 ```
-cargo run -- --redis-url {REDIS_URL} --host {LND_HOST} --port {LND_GRPC_PORT} --cert-file {PATH_TO_LND_TLS_CERT} --macaroon-file {PATH_TO_LND_ADMIN_MACAROON
+cargo run -- --redis-url {REDIS_URL} --lnd-host {LND_HOST} --lnd-port {LND_GRPC_PORT} --cert-file {PATH_TO_LND_TLS_CERT} --macaroon-file {PATH_TO_LND_ADMIN_MACAROON
 ```
 
 ### Docker
@@ -44,7 +44,7 @@ First create a data directory and put your tls.cert and admin.macaroon files the
 
 ```
 docker run \
--e FLAGS='--host host.docker.internal --port 10009 --cert-file /data/tls.cert --macaroon-file /data/admin.macaroon --database sled --db-path /data/preimages' \
+-e FLAGS='--lnd-host host.docker.internal --lnd-port 10009 --cert-file /data/tls.cert --macaroon-file /data/admin.macaroon --database sled --db-path /data/preimages' \
 -p 3001:3000 \
 -v /YOUR/TEMP/DIR/HERE:/data \
 --add-host=host.docker.internal:host-gateway" \
