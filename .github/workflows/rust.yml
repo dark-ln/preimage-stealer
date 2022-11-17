@@ -2,34 +2,93 @@ name: Tests
 
 on:
   pull_request:
+  push:
+    branches:
+      - master
 
 jobs:
-  rust_tests:
-    name: Rust Tests
+  check:
+    name: Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly
-          components: clippy, rustfmt
+          profile: minimal
+          toolchain: stable
+          override: true
 
-      - uses: actions/cache@v2
+      - uses: Swatinem/rust-cache@v1
+
+      - name: Run cargo check
+        uses: actions-rs/cargo@v1
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: cargo-${{ runner.os }}-rust-tests-${{ hashFiles('**/Cargo.toml') }}
-          restore-keys: |
-            cargo-${{ runner.os }}-rust-tests-
-            cargo-${{ runner.os }}-
+          command: check
 
-      - name: Check formatting
-        run: cargo fmt --check
+  test:
+    name: Test Suite
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        rust: [stable]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
 
-      - name: Check clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+      - name: Windows VCPKG
+        if: matrix.os == 'windows-latest'
+        run: echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Append
 
-      - name: Run tests
-        run: cargo test
+      - name: OpenSSL Windows
+        if: matrix.os == 'windows-latest'
+        run: vcpkg install openssl:x64-windows-static-md
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.rust }}
+          override: true
+
+      - uses: Swatinem/rust-cache@v1
+
+      - name: Run cargo test
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+
+
+  lints:
+    name: Lints
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+        with:
+          submodules: true
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v1
+
+      - name: Run cargo fmt
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+
+      - name: Run cargo clippy
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: -- -D warnings
