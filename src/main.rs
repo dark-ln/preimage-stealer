@@ -98,18 +98,11 @@ async fn main() {
     let server = axum::Server::bind(&addr).serve(router.into_make_service());
 
     // Prepare some signal for when the server should start shutting down...
-    let (tx, rx) = tokio::sync::oneshot::channel::<()>();
     let graceful = server.with_graceful_shutdown(async {
-        rx.await.ok();
+        tokio::signal::ctrl_c()
+            .await
+            .expect("failed to install CTRL+C signal handler");
     });
-
-    // shutdown when signaled
-    tokio::select! {
-        _ = tokio::signal::ctrl_c() => {
-            println!("Gracefully shutting down...");
-            let _ = tx.send(());
-        },
-    }
 
     // Await the `server` receiving the signal...
     if let Err(e) = graceful.await {
