@@ -1,4 +1,5 @@
 use clap::Parser;
+use tonic_openssl_lnd::LndClient;
 
 #[derive(Parser, Debug, Clone)]
 #[command(version, about, author)]
@@ -37,6 +38,22 @@ pub struct Config {
     #[clap(default_value_t = 3000, long)]
     /// Port for preimage-stealer's webserver
     pub port: u16,
+    #[clap(default_value_t = 50, long)]
+    /// The price, in sats, to sell preimages when requested
+    pub preimage_price: u64,
+}
+
+impl Config {
+    pub async fn create_lnd_client(self) -> LndClient {
+        let cert_file = self.cert_file.unwrap_or_else(default_cert_file);
+        let macaroon_file = self
+            .macaroon_file
+            .unwrap_or_else(|| default_macaroon_file(self.network));
+
+        tonic_openssl_lnd::connect(self.lnd_host, self.lnd_port, cert_file, macaroon_file)
+            .await
+            .expect("failed to connect")
+    }
 }
 
 fn home_dir() -> String {
